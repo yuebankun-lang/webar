@@ -28,7 +28,7 @@
      ↓
      点击「开始探索」
      ↓
-     自动旋转停止，启用手势交互
+     自动旋转停止（手势交互在开始体验后即可使用）
 ========================================================= -->
 
 <html>
@@ -319,9 +319,8 @@
      当中文语音讲解结束后，
      JavaScript 会显示这个提示。
 
-     下一阶段：
      点击「开始探索」后，
-     进入 3D 模型旋转与缩放交互。
+     停止自动旋转，进入手动旋转 / 缩放。
 ========================================================= -->
 
   <!-- =========================================================
@@ -331,7 +330,7 @@
 
      用户点击按钮后：
      1. 提示框消失
-     2. 自动旋转停止，启用手势交互
+     2. 自动旋转停止（手势交互之前就可以使用）
 ========================================================= -->
 
   <div id="explorePrompt">
@@ -352,7 +351,22 @@
   </div>
 
 
-  <a-scene mindar-image="imageTargetSrc: ./targets.mind;" color-space="sRGB"
+  <!-- =========================================================
+       MindAR 跟踪平滑参数
+
+       filterMinCF（最低截止频率）
+       调小 → 更平滑，但延迟更大
+
+       filterBeta（速度系数）
+       调大 → 快速移动时更跟手，但更容易抖
+       调小 → 更稳，但转动手机时会有拖影感
+
+       默认值：filterMinCF: 0.001 / filterBeta: 1000
+       下面的数值是更平滑的起点，
+       如果觉得延迟明显，把 filterBeta 逐步调大（0.1 → 1 → 10）。
+========================================================= -->
+
+  <a-scene mindar-image="imageTargetSrc: ./targets.mind; filterMinCF: 0.001; filterBeta: 0.01;" color-space="sRGB"
     renderer="colorManagement: true, physicallyCorrectLights" vr-mode-ui="enabled: false"
     device-orientation-permission-ui="enabled: false">
 
@@ -417,7 +431,7 @@
 ========================================================= -->
 
       <!-- MODEL ROOT：控制模型整体位置与大小 -->
-      <a-entity id="modelRoot" position="0 0 0.1" scale="0.1 0.1 0.1">
+      <a-entity id="modelRoot" position="0 -5 0.1" scale="3 3 3">
 
         <!--
        AUTO ROTATION｜自动旋转
@@ -562,34 +576,23 @@
        是为了提前“解锁”两个音频。
     --------------------------------------------------------- */
 
-    startButton.addEventListener("click", async () => {
+    /* 解锁单个音频：静音播放一次再暂停。
+
+       finally 保证 muted 一定会恢复。
+       否则某个音频解锁失败后（例如文件缺失），
+       muted 会一直停在 true，后面的播放全都没有声音。 */
+
+    async function unlockAudio(audio) {
+
+      audio.muted = true;
 
       try {
 
-        /* 解锁背景音乐 */
+        await audio.play();
 
-        bgMusic.muted = true;
+        audio.pause();
 
-        await bgMusic.play();
-
-        bgMusic.pause();
-
-        bgMusic.currentTime = 0;
-
-        bgMusic.muted = false;
-
-
-        /* 解锁语音讲解 */
-
-        narration.muted = true;
-
-        await narration.play();
-
-        narration.pause();
-
-        narration.currentTime = 0;
-
-        narration.muted = false;
+        audio.currentTime = 0;
 
       }
 
@@ -601,6 +604,28 @@
         );
 
       }
+
+      finally {
+
+        audio.muted = false;
+
+      }
+
+    }
+
+
+    startButton.addEventListener("click", async () => {
+
+      /*
+         两个音频同时开始解锁。
+         这样两个 play() 都在本次用户点击中同步调用，
+         不会因为等待第一个音频而错过浏览器的解锁时机。
+      */
+
+      await Promise.all([
+        unlockAudio(bgMusic),
+        unlockAudio(narration)
+      ]);
 
 
       /* 记录：用户已经开始体验 */
@@ -706,9 +731,16 @@
 
         }
 
-        /* 如果语音之前已经讲完，重新识别 Target 时，直接显示「开始探索」。*/
+        /*
+           如果语音之前已经讲完，
+           并且用户还没有进入探索模式，
+           重新识别 Target 时才显示「开始探索」。
+        */
 
-        if (narrationFinished) {
+        if (
+          narrationFinished &&
+          !exploring
+        ) {
 
           explorePrompt.style.display = "block";
 
@@ -844,16 +876,28 @@
        点击「开始探索」会停止自动旋转，方便手动旋转模型。
     ========================================================= */
 
-    /* 当前模型大小：自动读取 modelRoot 的 scale */
-    let currentScale =
-      modelRoot.getAttribute("scale").x;
+    /*
+       当前模型大小：读取 HTML 标签里写的初始 scale。
+
+       注意：
+       脚本执行时 A-Frame 场景可能还没有加载完成，
+       此时 getAttribute("scale") 返回的是 object3D 的默认值 1，
+       而不是标签里写的 "3 3 3"。
+       所以这里直接读取 DOM 属性字符串，避免初始值读错。
+    */
+
+    const initialScale =
+      parseFloat(
+        modelRoot.attributes.scale.value
+      ) || 1;
+
+    let currentScale = initialScale;
 
     /* 当前 Y 轴旋转角度 */
     let currentRotationY = 0;
 
     /* 缩放范围：初始大小的 0.5 倍到 7 倍 */
-    const initialScale = currentScale;
-    const minScale = initialScale * 0.1;
+    const minScale = initialScale * 0.5;
     const maxScale = initialScale * 7.0;
 
 
@@ -953,6 +997,22 @@
           )
         ) {
           return;
+        }
+
+        /*
+           捕获指针：
+           鼠标拖出浏览器窗口后再松开，
+           仍然能收到 pointerup；
+           否则这个指针会一直留在 activePointers 里，
+           之后不按键移动鼠标，模型也会跟着转。
+        */
+
+        if (event.target.setPointerCapture) {
+
+          event.target.setPointerCapture(
+            event.pointerId
+          );
+
         }
 
         activePointers.set(
@@ -1110,6 +1170,23 @@
     document.addEventListener(
       "pointercancel",
       endPointer
+    );
+
+
+    /* 窗口失去焦点时清空指针状态，
+       避免拖拽途中切换窗口后留下“一直按着”的假状态 */
+
+    window.addEventListener(
+      "blur",
+      () => {
+
+        activePointers.clear();
+
+        lastSingleX = null;
+
+        pinchStartDistance = null;
+
+      }
     );
 
 
