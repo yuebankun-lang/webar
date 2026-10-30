@@ -97,6 +97,23 @@
       cursor: pointer;
     }
 
+    #alignmentHint {
+      display: none;
+      position: fixed;
+      top: max(16px, env(safe-area-inset-top));
+      left: max(16px, env(safe-area-inset-left));
+      max-width: min(320px, calc(100vw - 32px));
+      padding: 10px 14px;
+      border-left: 3px solid #e6a23c;
+      border-radius: 6px;
+      background: rgba(0, 0, 0, 0.78);
+      color: #fff;
+      font-family: Arial, "Microsoft YaHei", sans-serif;
+      font-size: 14px;
+      line-height: 1.5;
+      z-index: 5000;
+    }
+
     /* =========================================================
    博物馆信息卡
 ========================================================= */
@@ -335,6 +352,11 @@
   </div>
 
 
+  <div id="alignmentHint">
+    单指拖动旋转，双指捏合缩放；微调模型位置，让霸王龙的骨架与肉体完美重叠。
+  </div>
+
+
   <!-- =========================================================
      开始探索提示
 
@@ -360,16 +382,16 @@
   <div id="explorePrompt">
 
     <div class="exploreTitle">
-      探索文物
+      探索远古生物
     </div>
 
     <div class="exploreText">
-      拖动模型进行旋转，<br>
-      使用鼠标滚轮或双指捏合进行放大与缩小。
+      使用单指旋转或双指捏合进行放大与缩小<br>
+      让霸王龙的骨架和肉体完美重叠直观感受
     </div>
 
     <button id="exploreButton">
-      开始探索
+      开始拟合
     </button>
 
   </div>
@@ -547,6 +569,9 @@
     const infoPanel =
       document.querySelector("#infoPanel");
 
+    const alignmentHint =
+      document.querySelector("#alignmentHint");
+
     const explorePrompt =
       document.querySelector("#explorePrompt");
 
@@ -691,6 +716,8 @@
 
         infoPanel.style.display = "block";
 
+        alignmentHint.style.display = "block";
+
       }
 
     });
@@ -792,6 +819,8 @@
 
           infoPanel.style.display = "block";
 
+          alignmentHint.style.display = "block";
+
         }
 
         /*
@@ -842,6 +871,8 @@
 
         /* 隐藏 Museum Label */
         infoPanel.style.display = "none";
+
+        alignmentHint.style.display = "none";
 
         /* 隐藏开始探索提示 */
         explorePrompt.style.display = "none";
@@ -1058,7 +1089,7 @@
         if (
           event.target.closest &&
           event.target.closest(
-            "#startScreen, #explorePrompt, #infoPanel"
+            "#startScreen, #explorePrompt, #infoPanel, #alignmentHint"
           )
         ) {
           return;
