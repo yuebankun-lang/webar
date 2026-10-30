@@ -158,6 +158,23 @@
       opacity: 0.9;
     }
 
+    #roarButton {
+      margin-top: 12px;
+      padding: 10px 16px;
+      border: none;
+      border-radius: 8px;
+      background: #e6a23c;
+      color: #1b1b1b;
+      font-size: 15px;
+      font-weight: bold;
+      cursor: pointer;
+    }
+
+    #roarButton:disabled {
+      cursor: not-allowed;
+      opacity: 0.7;
+    }
+
     /* =========================================================
     开始探索提示
 ========================================================= */
@@ -283,6 +300,9 @@
   <audio id="narration" src="./narration_voice.mp3" preload="auto">
   </audio>
 
+  <audio id="roarAudio" src="./dinosaur_roar.mp3" preload="auto">
+  </audio>
+
 
   <!-- =========================================================
      博物馆信息卡
@@ -302,11 +322,15 @@
     </div>
 
     <div class="objectInfo">
-      约白垩纪晚期 6800–6600 万年前<br>
+      约白垩纪晚期 6800 万年前<br>
       蜥形纲｜兽脚亚目肉食恐龙<br>
       化石主要发现于北美洲西部<br>
       史前顶级掠食者，拥有极强咬合力
     </div>
+
+    <button id="roarButton" type="button">
+      播放霸王龙吼叫
+    </button>
 
   </div>
 
@@ -514,6 +538,12 @@
     const narration =
       document.querySelector("#narration");
 
+    const roarAudio =
+      document.querySelector("#roarAudio");
+
+    const roarButton =
+      document.querySelector("#roarButton");
+
     const infoPanel =
       document.querySelector("#infoPanel");
 
@@ -549,6 +579,16 @@
     bgMusic.volume = 0.8;
 
     narration.volume = 1.0;
+
+    roarAudio.volume = 1.0;
+
+    roarAudio.addEventListener("error", () => {
+
+      roarButton.disabled = true;
+
+      roarButton.textContent = "未找到吼叫音频";
+
+    });
 
 
     /* ---------------------------------------------------------
@@ -624,7 +664,8 @@
 
       await Promise.all([
         unlockAudio(bgMusic),
-        unlockAudio(narration)
+        unlockAudio(narration),
+        unlockAudio(roarAudio)
       ]);
 
 
@@ -703,6 +744,28 @@
     }
 
 
+    roarButton.addEventListener("click", () => {
+
+      if (roarButton.disabled) {
+
+        return;
+
+      }
+
+      roarAudio.currentTime = 0;
+
+      roarAudio.play().catch((error) => {
+
+        console.log(
+          "Dinosaur roar error:",
+          error
+        );
+
+      });
+
+    });
+
+
     /* ---------------------------------------------------------
        6. 当 MindAR 识别到 Target
     --------------------------------------------------------- */
@@ -774,6 +837,8 @@
         bgMusic.pause();
 
         narration.pause();
+
+        roarAudio.pause();
 
         /* 隐藏 Museum Label */
         infoPanel.style.display = "none";
